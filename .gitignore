@@ -1,1 +1,4 @@
 /venv/
+chromedriver
+geckodriver
+geckodriver.log
