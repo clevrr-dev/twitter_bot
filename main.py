@@ -1,55 +1,89 @@
-import time
-import pandas
+# import time
+import random
+import sys
+from time import sleep
+
+from selenium import webdriver
+from selenium.common import exceptions
+
+import utils
 from user import TwitterUser
 
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument("--incognito")
+# chrome_options.add_experimental_option("detach", True)
 
-def read_file(filepath):
-    """
-    read username and password from accounts file
-    :param filepath:
-    :return accounts:
-    """
+driver = webdriver.Chrome(options=chrome_options)
 
-    columns = ['username', 'password', 'email', 'e_password']
-    df = pandas.read_csv(filepath, header=None, names=columns, delimiter=':')
-
-    credentials = [(x, y, z) for x, y, z in zip(df['username'], df['password'], df['email'])]
-
-    return credentials
+# driver.maximize_window()
+driver.implicitly_wait(5)
 
 
-def main():
+def main(message):
     """
     code starts here
     :return:
     """
-    # keep a list of users already messaged
-    already_messaged = []
-    locked_dm = []
+    credentials = utils.read_csv_file('accounts')
+    # targets = utils.read_file('usernames')
 
-    accounts = read_file('accounts')
+    message_sent = set(utils.read_file('message_sent_users'))
+    locked_dm = set(utils.read_file('locked_dm_users'))
 
-    for account in accounts:
-        username, password, email = account
+    # shuffle credentials
+    random.shuffle(credentials)
 
-        user = TwitterUser(username, password, email)
+    for credential in credentials:
+        print(credential)
+        username, password, email = credential
 
-        user.login()
+        # user = TwitterUser(driver, "YapanDilruba", "24v47v86", "shbprlukhof@outlook.com")
+        user = TwitterUser(driver, username, password, email)
 
-        time.sleep(4)
+        try:
+            user.login()
+            sleep(5)
 
-        user.logout()
+            targets = user.get_list_of_followers("ChristopheNice1")
 
-        time.sleep(5)
+            sleep(5)
 
-    # create a file for users that have been DMed
-    with open("users_already_dm.txt", "x") as file:
-        for user in already_messaged:
-            file.write(f"{user}\n")
+            for target in targets:
+                # check if message has already been sent to target
+                # and if target's dm is locked
+                print(target)
+                if target not in message_sent and target not in locked_dm:
+                    # send message
+                    sleep(random.randint(3, 7))
+                    sent_status = user.send_message(target, message)
+
+                    # check if message was sent
+                    if sent_status == 0:
+                        locked_dm.add(target)
+                        print(f"{target}'s DM is locked...")
+
+                    if sent_status == 1:
+                        message_sent.add(target)
+                        print(f"Message sent to {target}")
+
+            sleep(random.randint(3, 6))
+            user.logout()
+
+            sys.exit()
+
+            # sleep(random.randint(3, 6))
+
+        except exceptions.NoSuchElementException as e:
+            print(e)
+
+        # save to file
+        utils.save_to_file(message_sent, "message_sent_users")
+        utils.save_to_file(locked_dm, "locked_dm_users")
 
 
 if __name__ == "__main__":
-    # main()
-    accounts = read_file('accounts')
-    for account in accounts:
-        print(account)
+    # import threading
+    print("Enter message to send")
+    m = input(">>>")
+    # m = "Wow, Follow @christysaint699 Twitter. Her OF is only $3.50"
+    main(m)
