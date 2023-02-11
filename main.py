@@ -1,22 +1,19 @@
 # import time
+import utils
 import random
-import sys
+
 from time import sleep
 
 from selenium import webdriver
-from selenium.common import exceptions
 
-import utils
 from user import TwitterUser
 
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument("--incognito")
-# chrome_options.add_experimental_option("detach", True)
 
 driver = webdriver.Chrome(options=chrome_options)
 
-# driver.maximize_window()
-driver.implicitly_wait(5)
+driver.implicitly_wait(3)
 
 
 def main(message):
@@ -25,7 +22,6 @@ def main(message):
     :return:
     """
     credentials = utils.read_csv_file('accounts')
-    # targets = utils.read_file('usernames')
 
     message_sent = set(utils.read_file('message_sent_users'))
     locked_dm = set(utils.read_file('locked_dm_users'))
@@ -33,48 +29,48 @@ def main(message):
     # shuffle credentials
     random.shuffle(credentials)
 
+    start_account = utils.read_file("starting_account.txt")[0]
+
     for credential in credentials:
         print(credential)
         username, password, email = credential
 
-        # user = TwitterUser(driver, "YapanDilruba", "24v47v86", "shbprlukhof@outlook.com")
         user = TwitterUser(driver, username, password, email)
 
-        try:
-            user.login()
-            sleep(5)
+        user.login()
+        sleep(3)
 
-            targets = user.get_list_of_followers("ChristopheNice1")
+        targets = user.get_list_of_followers(f"{start_account}")
 
-            sleep(5)
+        for target in targets:
+            # check if message has already been sent to target
+            # and if target's dm is locked
+            print(target)
+            if target not in message_sent and target not in locked_dm:
+                # send message
+                sleep(random.randint(3, 5))
+                sent_status = user.send_message(target, message)
 
-            for target in targets:
-                # check if message has already been sent to target
-                # and if target's dm is locked
-                print(target)
-                if target not in message_sent and target not in locked_dm:
-                    # send message
-                    sleep(random.randint(3, 7))
-                    sent_status = user.send_message(target, message)
+                # check if message was sent
+                if sent_status == 0:
+                    locked_dm.add(target)
+                    print(f"{target}'s DM is locked")
+                    print("")
 
-                    # check if message was sent
-                    if sent_status == 0:
-                        locked_dm.add(target)
-                        print(f"{target}'s DM is locked...")
+                if sent_status == 1:
+                    message_sent.add(target)
+                    print(f"Message sent to {target}")
+                    print("")
 
-                    if sent_status == 1:
-                        message_sent.add(target)
-                        print(f"Message sent to {target}")
+                if sent_status == 2:
+                    locked_dm.add(target)
+                    print("Account not found")
 
-            sleep(random.randint(3, 6))
-            user.logout()
+        sleep(random.randint(3, 6))
+        user.logout()
 
-            sys.exit()
-
-            # sleep(random.randint(3, 6))
-
-        except exceptions.NoSuchElementException as e:
-            print(e)
+        # pick a random target as start_account for next loop
+        start_account = list(targets)[0]
 
         # save to file
         utils.save_to_file(message_sent, "message_sent_users")
@@ -82,8 +78,7 @@ def main(message):
 
 
 if __name__ == "__main__":
-    # import threading
-    print("Enter message to send")
-    m = input(">>>")
-    # m = "Wow, Follow @christysaint699 Twitter. Her OF is only $3.50"
-    main(m)
+    # start here
+    message = utils.read_file("message.txt")
+    comp_message = " ".join(message)
+    main(comp_message)
